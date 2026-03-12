@@ -41,7 +41,7 @@ class Simulation:
             alpha[0] = 0.0
             beta[0] = T[0]
 
-            for i in range(2, n - 1):
+            for i in range(1, n - 1):
                 Fi = - (rho * c / tau) * T[i]
                 denom = B - C * alpha[i-1]
                 alpha[i] = A / denom
