@@ -70,6 +70,7 @@ class ForestFireApp:
 
         self.min_height = min(min(row) for row in self.height)
         self.max_height = max(max(row) for row in self.height)
+        print(self.min_height, self.max_height)
 
     def start(self):
         self.running = True
