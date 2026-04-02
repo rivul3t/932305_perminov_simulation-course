@@ -8,14 +8,11 @@ def choice(options):
     epsilon = random.random()
     A = 1.
     k = 1
-
     while True:
         option, Pk = options[k-1]
         A = A - Pk
-
         if A <= epsilon:
             return option
-
         k += 1
 
 # =============================
