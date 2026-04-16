@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from scipy.stats import chisquare, chi2
+from scipy.stats import chisquare, chi2, norm
 import random
 
 from PyQt6.QtWidgets import (
@@ -80,10 +80,7 @@ def analyze_discrete(sample: np.ndarray, n: int, probs: np.ndarray):
 
     p_value = 1 - chi2.cdf(chi_val, df)
 
-    return emp_p, mean, var, rel_mean_err, rel_var_err, chi_val, p_value
-
-from scipy.stats import norm, chi2
-import numpy as np
+    return emp_p, mean, var, rel_mean_err, rel_var_err, chi_val, chi_crit, p_value
 
 def analyze_normal(sample: np.ndarray, n: int, bins: int = 6):
     true_mean = 0.0
@@ -269,14 +266,15 @@ class App(QMainWindow):
         table_box = QGroupBox("Результаты")
         table_layout = QVBoxLayout(table_box)
 
-        self.table = QTableWidget(0, 7)
+        self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels([
-            "Объем выборки",
+            "N",
             "Среднее",
             "Дисперсия",
-            "Отн. погрешн. ср.",
-            "Отн. погрешн. дисперсии",
+            "Отн. погр. ср.",
+            "Отн. погр. дисперсии",
             "χ²",
+            "χ² критическое",
             "p-value",
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -336,7 +334,7 @@ class App(QMainWindow):
 
         for i, n in enumerate(NS):
             sample = generate_discrete(n, self.probs)
-            emp_p, mean, var, rm, rv, chi_sq, p_value = analyze_discrete(sample, n, self.probs)
+            emp_p, mean, var, rm, rv, chi_sq, chi_crit, p_value = analyze_discrete(sample, n, self.probs)
 
             row = self.table.rowCount()
             self.table.insertRow(row)
@@ -348,6 +346,7 @@ class App(QMainWindow):
                 f"{rm:.4f}",
                 f"{rv:.4f}",
                 f"{chi_sq:.4f}",
+                f"{chi_crit:.4f}",                
                 f"{p_value:.4f}",
             ]
             for col, value in enumerate(values):
@@ -385,7 +384,7 @@ class App(QMainWindow):
         controls_layout.addWidget(self.run_normal_btn)
         controls_layout.addStretch()
 
-        self.normal_table = QTableWidget(0, 7)
+        self.normal_table = QTableWidget(0, 8)
         self.normal_table.setHorizontalHeaderLabels([
             "N",
             "Среднее",
@@ -393,6 +392,7 @@ class App(QMainWindow):
             "Отн. погр. ср.",
             "Отн. погр. дисперсии",
             "χ²",
+            "χ² критическое",
             "p-value",
         ])
         self.normal_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -447,6 +447,7 @@ class App(QMainWindow):
                 f"{rm:.4f}",
                 f"{rv:.4f}",
                 f"{chi2_val:.4f}",
+                f"{chi_crit:.4f}",
                 f"{p_value:.4f}",
             ]
 
