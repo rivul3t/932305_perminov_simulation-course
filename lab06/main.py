@@ -82,6 +82,43 @@ def analyze_discrete(sample: np.ndarray, n: int, probs: np.ndarray):
 
     return emp_p, mean, var, rel_mean_err, rel_var_err, chi_val, p_value
 
+from scipy.stats import norm, chi2
+import numpy as np
+
+def analyze_normal(sample: np.ndarray, n: int, bins: int = 6):
+    true_mean = 0.0
+    true_var = 1.0
+
+    mean = np.mean(sample)
+    var = np.var(sample)
+
+    rel_mean_err = abs(mean - true_mean)
+    rel_var_err = abs(var - true_var)
+
+    counts, bin_edges = np.histogram(sample, bins=bins)
+
+    O = counts
+
+    P = []
+    for i in range(len(bin_edges) - 1):
+        p = norm.cdf(bin_edges[i+1]) - norm.cdf(bin_edges[i])
+        P.append(p)
+
+    P = np.array(P)
+    E = n * P
+
+    mask = E > 0
+    O = O[mask]
+    E = E[mask]
+
+    chi_val = np.sum((O - E) ** 2 / E)
+
+    df = len(O) - 1
+
+    chi_crit = chi2.ppf(0.95, df)
+    p_value = 1 - chi2.cdf(chi_val, df)
+
+    return mean, var, rel_mean_err, rel_var_err, chi_val, p_value, chi_crit
 
 class MplCanvas(FigureCanvas):
     def __init__(self, nrows=1, ncols=1, figsize=(8, 6)):
@@ -335,16 +372,28 @@ class App(QMainWindow):
         controls_box = QGroupBox("Управление")
         controls_layout = QHBoxLayout(controls_box)
 
+        self.bins_input = QLineEdit("12")
+        self.bins_input.setFixedWidth(80)
+        self.bins_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        controls_layout.addWidget(QLabel("Количество бинов:"))
+        controls_layout.addWidget(self.bins_input)
+
         self.run_normal_btn = QPushButton("Запустить моделирование")
         self.run_normal_btn.clicked.connect(self.run_normal)
 
-        self.normal_table = QTableWidget(0, 5)
+        controls_layout.addWidget(self.run_normal_btn)
+        controls_layout.addStretch()
+
+        self.normal_table = QTableWidget(0, 7)
         self.normal_table.setHorizontalHeaderLabels([
             "N",
             "Среднее",
             "Дисперсия",
             "Отн. погр. ср.",
             "Отн. погр. дисперсии",
+            "χ²",
+            "p-value",
         ])
         self.normal_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.normal_table.verticalHeader().setVisible(False)
@@ -365,6 +414,14 @@ class App(QMainWindow):
         layout.addWidget(plots_box, stretch=1)
 
     def run_normal(self):
+        try:
+            bins = int(self.bins_input.text())
+            if bins < 2:
+                raise ValueError
+        except:
+            QMessageBox.critical(self, "Ошибка", "Введите число бинов >1")
+            return
+
         axes = self.normal_canvas.axes.ravel()
 
         for ax in axes:
@@ -378,11 +435,7 @@ class App(QMainWindow):
         for i, n in enumerate(NS):
             sample = generate_normal(n)
 
-            mean = np.mean(sample)
-            var = np.var(sample)
-
-            rel_mean_err = abs(mean - 0) / 1
-            rel_var_err = abs(var - 1) / 1
+            mean, var, rm, rv, chi2_val, p_value, chi_crit = analyze_normal(sample, n, bins)
 
             row = self.normal_table.rowCount()
             self.normal_table.insertRow(row)
@@ -391,8 +444,10 @@ class App(QMainWindow):
                 str(n),
                 f"{mean:.4f}",
                 f"{var:.4f}",
-                f"{rel_mean_err:.4f}",
-                f"{rel_var_err:.4f}",
+                f"{rm:.4f}",
+                f"{rv:.4f}",
+                f"{chi2_val:.4f}",
+                f"{p_value:.4f}",
             ]
 
             for col, v in enumerate(vals):
@@ -401,7 +456,7 @@ class App(QMainWindow):
                 self.normal_table.setItem(row, col, item)
 
             ax = axes[i]
-            ax.hist(sample, bins=30, density=True, alpha=0.7)
+            ax.hist(sample, bins=bins, density=True, alpha=0.7)
 
             ax.plot(x, pdf, linewidth=2)
             ax.set_title(f"N = {n}")
