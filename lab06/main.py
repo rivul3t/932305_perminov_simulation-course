@@ -30,6 +30,8 @@ VALUES = np.array([1, 2, 3, 4, 5], dtype=int)
 DEFAULT_PROBS = np.array([0.2, 0.2, 0.2, 0.2, 0.2], dtype=float)
 NS = [10, 100, 1000, 10000]
 
+MEAN, SIGMA = 1, 4
+
 
 def generate_discrete(n: int, probs: np.ndarray) -> np.ndarray:
     return np.random.choice(VALUES, size=n, p=probs)
@@ -42,6 +44,9 @@ def generate_normal(n: int) -> np.ndarray:
     
     z0 = np.sqrt(-2 * np.log(u1)) * np.cos(2 * np.pi * u2)
     z1 = np.sqrt(-2 * np.log(u1)) * np.sin(2 * np.pi * u2)
+
+    z0 = MEAN + SIGMA * z0
+    z1 = MEAN + SIGMA * z1
 
     res = np.empty(n)
     res[0::2] = z0
@@ -83,8 +88,8 @@ def analyze_discrete(sample: np.ndarray, n: int, probs: np.ndarray):
     return emp_p, mean, var, rel_mean_err, rel_var_err, chi_val, chi_crit, p_value
 
 def analyze_normal(sample: np.ndarray, n: int, bins: int = 6):
-    true_mean = 0.0
-    true_var = 1.0
+    true_mean = MEAN
+    true_var = SIGMA
 
     mean = np.mean(sample)
     var = np.var(sample)
@@ -98,7 +103,7 @@ def analyze_normal(sample: np.ndarray, n: int, bins: int = 6):
 
     P = []
     for i in range(len(bin_edges) - 1):
-        p = norm.cdf(bin_edges[i+1]) - norm.cdf(bin_edges[i])
+        p = norm.cdf(bin_edges[i+1], loc=MEAN, scale=SIGMA) - norm.cdf(bin_edges[i], loc=MEAN, scale=SIGMA)
         P.append(p)
 
     P = np.array(P)
@@ -429,8 +434,8 @@ class App(QMainWindow):
 
         self.normal_table.setRowCount(0)
 
-        x = np.linspace(-4, 4, 400)
-        pdf = (1 / np.sqrt(2 * np.pi)) * np.exp(-x**2 / 2)
+        x = np.linspace(MEAN - SIGMA * 4, MEAN + SIGMA * 4, 800)
+        pdf = (1 / (np.sqrt(2 * np.pi) * SIGMA)) * np.exp(-((x-MEAN)/SIGMA)**2 / 2)
 
         for i, n in enumerate(NS):
             sample = generate_normal(n)
