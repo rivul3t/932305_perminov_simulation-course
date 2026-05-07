@@ -30,29 +30,9 @@ VALUES = np.array([1, 2, 3, 4, 5], dtype=int)
 DEFAULT_PROBS = np.array([0.2, 0.2, 0.2, 0.2, 0.2], dtype=float)
 NS = [10, 100, 1000, 10000]
 
-MEAN, SIGMA = 1, 4
-
-
 def generate_discrete(n: int, probs: np.ndarray) -> np.ndarray:
     return np.random.choice(VALUES, size=n, p=probs)
 
-
-def generate_normal(n: int) -> np.ndarray:
-    u1 = np.random.rand(n // 2)
-    u2 = np.random.rand(n // 2)
-
-    
-    z0 = np.sqrt(-2 * np.log(u1)) * np.cos(2 * np.pi * u2)
-    z1 = np.sqrt(-2 * np.log(u1)) * np.sin(2 * np.pi * u2)
-
-    z0 = MEAN + SIGMA * z0
-    z1 = MEAN + SIGMA * z1
-
-    res = np.empty(n)
-    res[0::2] = z0
-    res[1::2] = z1
-
-    return res
 
 
 def analyze_discrete(sample: np.ndarray, n: int, probs: np.ndarray):
@@ -86,41 +66,6 @@ def analyze_discrete(sample: np.ndarray, n: int, probs: np.ndarray):
     p_value = 1 - chi2.cdf(chi_val, df)
 
     return emp_p, mean, var, rel_mean_err, rel_var_err, chi_val, chi_crit, p_value
-
-def analyze_normal(sample: np.ndarray, n: int, bins: int = 6):
-    true_mean = MEAN
-    true_var = SIGMA
-
-    mean = np.mean(sample)
-    var = np.var(sample)
-
-    rel_mean_err = abs(mean - true_mean)
-    rel_var_err = abs(var - true_var)
-
-    counts, bin_edges = np.histogram(sample, bins=bins)
-
-    O = counts
-
-    P = []
-    for i in range(len(bin_edges) - 1):
-        p = norm.cdf(bin_edges[i+1], loc=MEAN, scale=SIGMA) - norm.cdf(bin_edges[i], loc=MEAN, scale=SIGMA)
-        P.append(p)
-
-    P = np.array(P)
-    E = n * P
-
-    mask = E > 0
-    O = O[mask]
-    E = E[mask]
-
-    chi_val = np.sum((O - E) ** 2 / E)
-
-    df = len(O) - 1
-
-    chi_crit = chi2.ppf(0.95, df)
-    p_value = 1 - chi2.cdf(chi_val, df)
-
-    return mean, var, rel_mean_err, rel_var_err, chi_val, p_value, chi_crit
 
 class MplCanvas(FigureCanvas):
     def __init__(self, nrows=1, ncols=1, figsize=(8, 6)):
@@ -380,8 +325,22 @@ class App(QMainWindow):
         self.bins_input.setFixedWidth(80)
         self.bins_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        self.mean = QLineEdit("0")
+        self.mean.setFixedWidth(80)
+        self.mean.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.sigma = QLineEdit("2")
+        self.sigma.setFixedWidth(80)
+        self.sigma.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         controls_layout.addWidget(QLabel("Количество бинов:"))
         controls_layout.addWidget(self.bins_input)
+
+        controls_layout.addWidget(QLabel("Среднее:"))
+        controls_layout.addWidget(self.mean)
+
+        controls_layout.addWidget(QLabel("Среднеквадратичное отклонение:"))
+        controls_layout.addWidget(self.sigma)
 
         self.run_normal_btn = QPushButton("Запустить моделирование")
         self.run_normal_btn.clicked.connect(self.run_normal)
@@ -434,13 +393,15 @@ class App(QMainWindow):
 
         self.normal_table.setRowCount(0)
 
-        x = np.linspace(MEAN - SIGMA * 4, MEAN + SIGMA * 4, 800)
-        pdf = (1 / (np.sqrt(2 * np.pi) * SIGMA)) * np.exp(-((x-MEAN)/SIGMA)**2 / 2)
+        mean, sigma = float(self.mean.text()), float(self.sigma.text())
+
+        x = np.linspace(mean - sigma * 4, mean + sigma * 4, 800)
+        pdf = (1 / (np.sqrt(2 * np.pi) * sigma)) * np.exp(-((x-mean)/sigma)**2 / 2)
 
         for i, n in enumerate(NS):
-            sample = generate_normal(n)
+            sample = self.generate_normal(n)
 
-            mean, var, rm, rv, chi2_val, p_value, chi_crit = analyze_normal(sample, n, bins)
+            mean, var, rm, rv, chi2_val, p_value, chi_crit = self.analyze_normal(sample, n, bins)
 
             row = self.normal_table.rowCount()
             self.normal_table.insertRow(row)
@@ -470,6 +431,63 @@ class App(QMainWindow):
 
         self.normal_canvas.fig.suptitle("Нормальное распределение", fontsize=14)
         self.normal_canvas.draw()
+
+    def generate_normal(self, n: int) -> np.ndarray:
+        mean, sigma = float(self.mean.text()), float(self.sigma.text())
+
+        u1 = np.random.rand(n // 2)
+        u2 = np.random.rand(n // 2)
+
+
+        z0 = np.sqrt(-2 * np.log(u1)) * np.cos(2 * np.pi * u2)
+        z1 = np.sqrt(-2 * np.log(u1)) * np.sin(2 * np.pi * u2)
+
+        z0 = mean + sigma * z0
+        z1 = mean + sigma * z1
+
+        res = np.empty(n)
+        res[0::2] = z0
+        res[1::2] = z1
+
+        return res
+
+    def analyze_normal(self, sample: np.ndarray, n: int, bins: int = 6):
+    
+        mean, sigma = float(self.mean.text()), float(self.sigma.text())
+    
+        true_mean = mean
+        true_var = sigma ** 2
+    
+        mean = np.mean(sample)
+        var = np.var(sample)
+    
+        rel_mean_err = abs(mean - true_mean)
+        rel_var_err = abs(var - true_var)
+    
+        counts, bin_edges = np.histogram(sample, bins=bins)
+    
+        O = counts
+    
+        P = []
+        for i in range(len(bin_edges) - 1):
+            p = norm.cdf(bin_edges[i+1], loc=mean, scale=sigma) - norm.cdf(bin_edges[i], loc=mean, scale=sigma)
+            P.append(p)
+    
+        P = np.array(P)
+        E = n * P
+    
+        mask = E > 0
+        O = O[mask]
+        E = E[mask]
+    
+        chi_val = np.sum((O - E) ** 2 / E)
+    
+        df = len(O) - 1
+    
+        chi_crit = chi2.ppf(0.95, df)
+        p_value = 1 - chi2.cdf(chi_val, df)
+    
+        return mean, var, rel_mean_err, rel_var_err, chi_val, p_value, chi_crit
 
 def main():
     app = QApplication(sys.argv)
